@@ -14,6 +14,7 @@ import sys
 root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append("%s/.." % root)
 
+from sklearn import datasets
 from sklearn.datasets import make_regression
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
@@ -71,7 +72,7 @@ class LinearRegression(Model):
         Model {[type]} -- [description]
     """
 
-    def __init__(self, learning_rate=0.01, iterations=1000, regularization=None):
+    def __init__(self, learning_rate=0.00001, iterations=100000, regularization=None):
         super(Model, self).__init__()
         self.learning_rate = learning_rate
         self.iterarions = iterations
@@ -89,7 +90,7 @@ class LinearRegression(Model):
         return self.mse
 
     def gradient_descent(self, X, y, y_hat):
-        grad = (-np.dot((y-y_hat), X))/(2*self.n_samples) + self.regularization.grad(self.theta)
+        grad = (-np.dot((y-y_hat), X))/(self.n_samples) + self.regularization.grad(self.theta)
         self.theta = self.theta - self.learning_rate * grad
 
 
@@ -110,43 +111,75 @@ class LinearRegression(Model):
         self.init_weights(X)
         X = self.add_bias_col(X)
         self.training_errors = list()
+        print(self.theta)
         for iter in range(self.iterarions):
             y_pred = X.dot(self.theta)
             # Calculate l2 loss
             mse = self.l2_loss(y_pred, y)
-            # mse = np.mean(0.5 * (y - y_pred)**2 + self.regularization(self.theta))
+            mse = np.mean(0.5 * (y - y_pred)**2 + self.regularization(self.theta))
             self.training_errors.append(mse)
             # # Gradient of l2 loss w.r.t w
-            # grad_w = -(y - y_pred).dot(X)/(2*self.n_samples) + self.regularization.grad(self.theta)
+            grad_w = -(y - y_pred).dot(X) + self.regularization.grad(self.theta)
             # # Update the weights
-            # self.theta -= self.learning_rate * grad_w
-            self.gradient_descent(X, y , y_pred)
+            self.theta -= self.learning_rate * grad_w
+            # self.gradient_descent(X, y , y_pred)
+            # print(self.theta, grad_w)
+            if iter % 100 == 0: print("{0}th iter mse: {1}".format(iter, mse))
 
     def predict(self, X):
         X = self.add_bias_col(X)
         y_hat = np.dot(X, self.theta)
         return y_hat
+    
+    def score(self, X, y):
+        from sklearn.metrics import r2_score
+        return r2_score(y, self.predict(X))
 
 def main():
+
+    X = np.array([[1, 1], [1, 2], [2, 2], [2, 3]])
+    y = np.dot(X, np.array([1, 2])) + 3
+    reg = LinearRegression()
+    reg.fit(X, y)
+    print(reg.score(X,y ))
+    print(reg.predict(np.array([[3, 5]])))
+    sys.exit(0)
+
+
+
     X, y = make_regression(n_samples=100000, n_features=1)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4)
     n_samples, n_features = np.shape(X)
 
+    diabetes = datasets.load_diabetes()
+
+
+    # Use only one feature
+    diabetes_X = diabetes.data[:, np.newaxis, 2]
+
+    # Split the data into training/testing sets
+    X_train = diabetes_X[:-20]
+    X_test = diabetes_X[-20:]
+
+    # Split the targets into training/testing sets
+    y_train = diabetes.target[:-20]
+    y_test = diabetes.target[-20:]
+
     # 可自行设置模型参数，如正则化，梯度下降轮数学习率等
 
-    model = LinearRegression(learning_rate=0.1,iterations=100, regularization=L2Regularization(alpha=0.5))
+    model = LinearRegression(learning_rate=0.1,iterations=10, regularization=None)
 
     model.fit(X_train,y_train)
 
     # Training error plot 画loss的图
-    n = len(model.training_errors)
-    training, = plt.plot(range(n), model.training_errors, label="Training Error")
-    plt.legend(handles=[training])
-    plt.title("Error Plot")
-    plt.ylabel('Mean Squared Error')
-    plt.xlabel('Iterations')
-    plt.savefig('./train.png')
+    # n = len(model.training_errors)
+    # training, = plt.plot(range(n), model.training_errors, label="Training Error")
+    # plt.legend(handles=[training])
+    # plt.title("Error Plot")
+    # plt.ylabel('Mean Squared Error')
+    # plt.xlabel('Iterations')
+    # plt.savefig('./train.png')
 
     y_pred = model.predict(X_test)
     y_pred = np.reshape(y_pred, y_test.shape)
@@ -154,21 +187,29 @@ def main():
     mse = mean_squared_error(y_test, y_pred)
     print("Mean squared error: %s" % (mse))
 
-    y_pred_line = model.predict(X)
+    y_pred_line = model.predict(X_test)
 
     # Color map
     cmap = plt.get_cmap('viridis')
 
     # Plot the results，画拟合情况的图
-    m1 = plt.scatter(366 * X_train, y_train, color=cmap(0.9), s=10)
-    m2 = plt.scatter(366 * X_test, y_test, color=cmap(0.5), s=10)
-    plt.plot(366 * X, y_pred_line, color='black', linewidth=2, label="Prediction")
-    plt.suptitle("Linear Regression")
-    plt.title("MSE: %.2f" % mse, fontsize=10)
-    plt.xlabel('Day')
-    plt.ylabel('Temperature in Celcius')
-    plt.legend((m1, m2), ("Training data", "Test data"), loc='lower right')
-    plt.savefig("linear_regression.png")
+    # m1 = plt.scatter(366 * X_train, y_train, color=cmap(0.9), s=10)
+    # m2 = plt.scatter(366 * X_test, y_test, color=cmap(0.5), s=10)
+    # # plt.plot(366 * X, y_pred_line, color='black', linewidth=2, label="Prediction")
+    # plt.suptitle("Linear Regression")
+    # plt.title("MSE: %.2f" % mse, fontsize=10)
+    # plt.xlabel('Day')
+    # plt.ylabel('Temperature in Celcius')
+    # plt.legend((m1, m2), ("Training data", "Test data"), loc='lower right')
+    # plt.savefig("linear_regression.png")
+    
+    ax = plt.plot()
+    plt.scatter(X_test, y_test,  color='black')
+    plt.plot(X_test, y_pred_line, color='blue', linewidth=3)
+
+    plt.xticks(())
+    plt.yticks(())
+    plt.savefig('linear_fit.png')
 
 if __name__ == "__main__":
     main()
